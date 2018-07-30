@@ -10,9 +10,9 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/target)
 # use BOOST_ROOT to set the search location.. on windows we need explicit paths
 set(Boost_USE_STATIC_LIBS ON)
 if (NOT (platform STREQUAL "Windows" ) )
-    find_package(Boost COMPONENTS regex system filesystem graph program_options REQUIRED)
+    find_package(Boost COMPONENTS system filesystem program_options REQUIRED)
 elseif (NOT (BOOST_INCLUDEDIR AND BOOST_LIBRARYDIR))
-    find_package(Boost COMPONENTS regex system filesystem graph program_options REQUIRED)
+    find_package(Boost COMPONENTS system filesystem program_options REQUIRED)
 else()
     set(Boost_LIBRARY_DIRS "${BOOST_LIBRARYDIR}")
     set(Boost_INCLUDE_DIRS "${BOOST_INCLUDEDIR}")
@@ -35,12 +35,11 @@ set_target_properties(ionic-profiles PROPERTIES LINK_SEARCH_START_STATIC 1)
 set_target_properties(ionic-profiles PROPERTIES LINK_SEARCH_END_STATIC 1)
 set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
 
-# osx specific
+# MacOS specific
 if ( platform STREQUAL "MacOSX" )
     target_link_libraries(ionic-profiles "boost_system")
     target_link_libraries(ionic-profiles "boost_filesystem")
     target_link_libraries(ionic-profiles "boost_program_options")
-    target_link_libraries(ionic-profiles "boost_graph")
     target_link_libraries(ionic-profiles "ISAgentSDK")
     target_link_libraries(ionic-profiles
         "-framework CoreServices"
@@ -56,7 +55,6 @@ if ( platform STREQUAL "Linux" )
     target_link_libraries(ionic-profiles "boost_system")
     target_link_libraries(ionic-profiles "boost_filesystem")
     target_link_libraries(ionic-profiles "boost_program_options")
-    target_link_libraries(ionic-profiles "boost_graph")
     target_link_libraries(ionic-profiles "ISAgentSDK")
     target_link_libraries(ionic-profiles
         "pthread"

@@ -14,6 +14,9 @@
 #include "ISEnrollmentError.h"
 #include "Confirmation.h"
 
+#include "boost/filesystem.hpp"
+namespace fs = boost::filesystem;
+
 
 void ISDevCliConfigDelete::printUsageHeader() {
 	cout << PROFILES_DELETE_DESCRIPTION << endl;
@@ -78,12 +81,25 @@ void ISDevCliConfigDelete::removeProfile(ISAgent *pAgent) {
 			cout	<< "[SUCCESS] Found profile with ID: " << sDeviceId
 					<< " and deleted it." << endl;
 		} else {
-			fatal(ISSET_ERROR_DEVICE_ID_NOTFOUND,
-				"[!FATAL] Delete profile could not find a profile of given Persistor type (" +
-				leadPersistor.sType + ") with given device ID (" +
-				sDeviceId + ") in given path (" +
-				leadPersistor.sPath +
-				").\n Use the list option to view your existing profiles.");
+			// check if file exists
+			if (!fs::exists(leadPersistor.sPath)) {
+				//error on no file
+				cout	<< "CRWCRW DELETE: ERROR on NO FILE"	<< endl;
+				fatal(ISSET_ERROR_PERSISTOR_SAVE_FAILED,
+					"[!FATAL] Delete profile could not find file for given Persistor type (" +
+					leadPersistor.sType + ") in given path (" +
+					leadPersistor.sPath +
+					"). Check persistor-path.");
+			} else {
+				// error on deviceId
+				cout	<< "CRWCRW DELETE: ERROR on NO DEVICE"	<< endl;
+				fatal(ISSET_ERROR_DEVICE_ID_NOTFOUND,
+					"[!FATAL] Delete profile could not find a profile of given Persistor type (" +
+					leadPersistor.sType + ") with given device ID (" +
+					sDeviceId + ") in given path (" +
+					leadPersistor.sPath +
+					").\n Use the list option to view your existing profiles.");
+			}
 		}
 	} else {
 		cout	<< "Okay, did NOT delete profile with ID: "

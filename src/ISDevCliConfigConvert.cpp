@@ -59,19 +59,19 @@ void ISDevCliConfigConvert::getConfigFromFile() {
 	// extract configs
 	boost::optional<string> op;
 
-	if (op = jsonConfig.get_optional<string>(PROFILE_OPTION_TARGET_PERSISTOR)) {
+	if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_TARGET_PERSISTOR))) {
 		targetPersistor.sType = *op;
 	}
-	if (op = jsonConfig.get_optional<string>(PROFILE_OPTION_TARGET_PERSISTOR_PATH)) {
+	if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_TARGET_PERSISTOR_PATH))) {
 		targetPersistor.sPath = *op;
 	}
-	if (op = jsonConfig.get_optional<string>(PROFILE_OPTION_TARGET_PERSISTOR_PASSWORD)) {
+	if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_TARGET_PERSISTOR_PASSWORD))) {
 		targetPersistor.sPassword = *op;
 	}
-	if (op = jsonConfig.get_optional<string>(PROFILE_OPTION_TARGET_PERSISTOR_AESGCM_KEY)) {
+	if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_TARGET_PERSISTOR_AESGCM_KEY))) {
 		targetPersistor.sAesGcmKey = *op;
 	}
-	if (op = jsonConfig.get_optional<string>(PROFILE_OPTION_TARGET_PERSISTOR_AESGCM_ADATA)) {
+	if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_TARGET_PERSISTOR_AESGCM_ADATA))) {
 		targetPersistor.sAesGcmAdata = *op;
 	}
 }
@@ -127,7 +127,7 @@ void ISDevCliConfigConvert::buildOptions() {
 		(PROFILE_OPTION_TARGET_PERSISTOR_PATH, po::value<string>(),
 			"Convert output path to target profile\n")
 		(PROFILE_OPTION_TARGET_PERSISTOR_PASSWORD,
-			po::value<string>(),
+			po::value<string>()->implicit_value(""),
 			"Convert output password to use to protect a 'password' persistor. \n"
 			"Only applicable if '--target-persistor' is set to 'password'\n ")
 		(PROFILE_OPTION_TARGET_PERSISTOR_AESGCM_KEY, po::value<string>(),
