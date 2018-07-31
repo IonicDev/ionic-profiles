@@ -96,22 +96,22 @@ void ISDevCliConfig::getConfigFromFile() {
 	// extract configs
 	boost::optional<string> op;
 
-	if (op = jsonConfig.get_optional<string>(PROFILE_OPTION_PERSISTOR)) {
+	if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_PERSISTOR))) {
 		leadPersistor.sType = *op;
 	}
-	if (op = jsonConfig.get_optional<string>(PROFILE_OPTION_PERSISTOR_PATH)) {
+	if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_PERSISTOR_PATH))) {
 		leadPersistor.sPath = *op;
 	}
-	if (op = jsonConfig.get_optional<string>(PROFILE_OPTION_PERSISTOR_PASSWORD)) {
+	if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_PERSISTOR_PASSWORD))) {
 		leadPersistor.sPassword = *op;
 	}
-	if (op = jsonConfig.get_optional<string>(PROFILE_OPTION_PERSISTOR_AESGCM_KEY)) {
+	if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_PERSISTOR_AESGCM_KEY))) {
 		leadPersistor.sAesGcmKey = *op;
 	}
-	if (op = jsonConfig.get_optional<string>(PROFILE_OPTION_PERSISTOR_AESGCM_ADATA)) {
+	if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_PERSISTOR_AESGCM_ADATA))) {
 		leadPersistor.sAesGcmAdata = *op;
 	}
-	if (op = jsonConfig.get_optional<string>(PROFILE_OPTION_PERSISTOR_VERSION)) {
+	if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_PERSISTOR_VERSION))) {
 		leadPersistor.sVersion = *op;
 	}
 
@@ -190,7 +190,7 @@ void ISDevCliConfig::buildOptions() {
 			"profile persistor type\n(plaintext, password, aesgcm, default) 'default' if none given\n")
 		(PROFILE_OPTION_PERSISTOR_PATH, po::value<string>(),
 			"path to profile file\n")
-		(PROFILE_OPTION_PERSISTOR_PASSWORD, po::value<string>(),
+		(PROFILE_OPTION_PERSISTOR_PASSWORD, po::value<string>()->implicit_value(""),
 			"password to use to protect a 'password' persistor. \n"
 			"Only applicable if '--persistor' is set to 'password'\n ")
 		(PROFILE_OPTION_PERSISTOR_AESGCM_KEY, po::value<string>(),

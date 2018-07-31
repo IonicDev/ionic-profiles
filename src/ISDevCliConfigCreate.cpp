@@ -53,38 +53,38 @@ void ISDevCliConfigCreate::getConfigFromFile() {
 	boost::optional<string> op;
 
 	// Select Enrollment Method: Assertion, E-mail
-	if (op = jsonConfig.get_optional<string>(PROFILE_OPTION_AUTH_METHOD)) {
+	if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_AUTH_METHOD))) {
 		sAuthMethod = *op;
-	} else if (op = jsonConfig.get_optional<string>(PROFILE_OPTION_ENROLLMENT_METHOD)) {  // DEPRECATED
+	} else if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_ENROLLMENT_METHOD))) {  // DEPRECATED
 		sAuthMethod = *op;
 	}
 
 	// Select Keyspace profile belongs in
-	if (op = jsonConfig.get_optional<string>(PROFILE_OPTION_KEYSPACE)) {
+	if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_KEYSPACE))) {
 		sKeyspace = *op;
 	}
 
 	// If Enrollment method is assertion provide path and filename
-	if (op = jsonConfig.get_optional<string>(PROFILE_OPTION_ASSERTION_FILEPATH)) {
+	if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_ASSERTION_FILEPATH))) {
 		sAssertionFilePath = *op;
 	}
 
 	// check for es-url option
-	if (op = jsonConfig.get_optional<string>(PROFILE_OPTION_ES_URL)) {
+	if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_ES_URL))) {
 		sEsGenAssnUrl = *op;
 	}
 	// only check for es-headless-url option if no es-url
-	else if (op = jsonConfig.get_optional<string>(PROFILE_OPTION_ES_HEADLESS_URL)) {
+	else if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_ES_HEADLESS_URL))) {
 		sEsGenAssnUrl = *op;
 	}
 
 	// Set Url for PubKey <Deprecated in favor of extracting from response>
-	if (op = jsonConfig.get_optional<string>(PROFILE_OPTION_ES_PUBKEY_URL)) {
+	if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_ES_PUBKEY_URL))) {
 		sEsPubkeyUrl = *op;
 	}
 
 	// Set Url for API <Deprecated in favor of extracting from response>
-	if (op = jsonConfig.get_optional<string>(PROFILE_OPTION_API_URL)) {
+	if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_API_URL))) {
 		sApiUrl = *op;
 	}
 
@@ -558,7 +558,7 @@ void ISDevCliConfigCreate::createIonicProfile(ISAgent * pAgent,
 	// send device registration request
 	ISAgentCreateDeviceResponse createDeviceResponse;
 	nErr = pAgent->createDevice(createDeviceRequest, createDeviceResponse);
-	if (nErr != ISAGENT_OK)
+	if (nErr != ISAGENT_OK) {
 		if (nErr == ISAGENT_UNEXPECTEDRESPONSE) {
 			fatal(ISSET_ERROR_DEVICE_REGISTRATION_FAILED,
 				"Registration request to API server failed (Try verifying email)");
@@ -566,6 +566,7 @@ void ISDevCliConfigCreate::createIonicProfile(ISAgent * pAgent,
 			fatal(ISSET_ERROR_DEVICE_REGISTRATION_FAILED,
 				"Registration request to API server failed");
 		}
+	}
 
 	// extract device profile from registration response
 	deviceProfileOut = createDeviceResponse.getDeviceProfile();

@@ -13,6 +13,9 @@
 #include "ISDevUtils.h"
 #include "ISEnrollmentError.h"
 
+#include "boost/filesystem.hpp"
+namespace fs = boost::filesystem;
+
 
 void ISDevCliConfigSet::printConfigBody() {
 	cout	<< LINE_LEAD << PROFILE_OPTION_DEVICE_ID << "              "
@@ -23,20 +26,9 @@ void ISDevCliConfigSet::printConfigBody() {
 }
 
 
-/*  We don't want PROILE_OPTION_DEVICE_ID from config file,
+/*  FYI: We don't want PROILE_OPTION_DEVICE_ID from config file,
  *  everything else we need is captured from base class ISDevCliConfig
-
-void ISDevCliConfigSet::getConfigFromFile(string sConfigFilePath) {
-
-	parseConfigFile(sConfigFilePath);
-
-	// extract configs
-	boost::optional<string> op;
-
-	if (op = jsonConfig.get_optional<string>(PROILE_OPTION_DEVICE_ID)) {
-		sDeviceId = *op;
-	}
-}
+ *  so no getConfigFromFile
 */
 
 
@@ -120,12 +112,25 @@ void ISDevCliConfigSet::setActiveProfile(ISAgent *pAgent) {
 		cout	<< "[SUCCESS] Set profile with ID: " << sDeviceId
 				<< " as current active device profile." << endl;
 	} else {
-		fatal(ISSET_ERROR_DEVICE_ID_NOTFOUND,
-			"[!FATAL] Set active profile could not find a profile of given Persistor type (" +
-			leadPersistor.sType + ") with given device ID (" +
-			sDeviceId + ") in given path (" +
-			leadPersistor.sPath +
-			").\n Use the list option to view your existing profiles.");
+		// check if file exists
+		if (!fs::exists(leadPersistor.sPath)) {
+			//error on no file
+			cout	<< "CRWCRW SET: ERROR on NO FILE"	<< endl;
+			fatal(ISSET_ERROR_PERSISTOR_SAVE_FAILED,
+				"[!FATAL] Set active profile could not find file for given Persistor type (" +
+				leadPersistor.sType + ") in given path (" +
+				leadPersistor.sPath +
+				"). Check persistor-path.");
+		} else {
+			// error on deviceId
+			cout	<< "CRWCRW SET: ERROR on NO DEVICE"	<< endl;
+			fatal(ISSET_ERROR_DEVICE_ID_NOTFOUND,
+				"[!FATAL] Set active profile could not find a profile of given Persistor type (" +
+				leadPersistor.sType + ") with given device ID (" +
+				sDeviceId + ") in given path (" +
+				leadPersistor.sPath +
+				").\n Use the list option to view your existing profiles.");
+		}
 	}
 
 	delete(persistor);		  // Heap alloc in abstracted function
