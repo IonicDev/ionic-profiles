@@ -52,6 +52,8 @@ class ISDevCliConfigConvert : public ISDevCliConfigSet {
 
 		void convertProfiles(ISAgent *pAgent);
 
+		void persistorPathFixer();
+
 		void convertHelper(vector<ISAgentDeviceProfile>& vecProfilesOut,
 					string sActiveDeviceIdOut);
 

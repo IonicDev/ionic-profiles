@@ -115,7 +115,6 @@ void ISDevCliConfigSet::setActiveProfile(ISAgent *pAgent) {
 		// check if file exists
 		if (!fs::exists(leadPersistor.sPath)) {
 			//error on no file
-			cout	<< "CRWCRW SET: ERROR on NO FILE"	<< endl;
 			fatal(ISSET_ERROR_PERSISTOR_SAVE_FAILED,
 				"[!FATAL] Set active profile could not find file for given Persistor type (" +
 				leadPersistor.sType + ") in given path (" +
@@ -123,7 +122,6 @@ void ISDevCliConfigSet::setActiveProfile(ISAgent *pAgent) {
 				"). Check persistor-path.");
 		} else {
 			// error on deviceId
-			cout	<< "CRWCRW SET: ERROR on NO DEVICE"	<< endl;
 			fatal(ISSET_ERROR_DEVICE_ID_NOTFOUND,
 				"[!FATAL] Set active profile could not find a profile of given Persistor type (" +
 				leadPersistor.sType + ") with given device ID (" +
