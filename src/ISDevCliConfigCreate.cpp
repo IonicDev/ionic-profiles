@@ -20,7 +20,6 @@
 namespace fs = boost::filesystem;
 
 
-
 void ISDevCliConfigCreate::printConfigBody() {
 
 	cout	<< LINE_LEAD << PROFILE_OPTION_AUTH_METHOD << "            "
@@ -312,7 +311,6 @@ string ISDevCliConfigCreate::emailRequestBody() {
 string ISDevCliConfigCreate::samlRequestBody() {
 	return "SAMLResponse=" + UriEncode(sAssertionData);
 }
-
 
 void ISDevCliConfigCreate::getIonicAuthentication(string & sToken,
 		string & sUidauth) {
@@ -659,6 +657,9 @@ void ISDevCliConfigCreate::storeIonicProfile(ISAgent * pAgent,
 				pWinPersistor->setFormatVersionOverride(leadPersistor.sVersion);
 			}
 			pPersistor = pWinPersistor;
+			if (leadPersistor.sPath.empty()) {
+				leadPersistor.sPath = pWinPersistor->getDefaultFilePath();
+			}
 #else
 			fatal(ISSET_ERROR_INVALID_PERSISTOR,
 					"Invalid state. Can not use Windows persistor on a non-Windows system");
@@ -692,9 +693,13 @@ void ISDevCliConfigCreate::storeIonicProfile(ISAgent * pAgent,
 	//   OR we have to create that missing path
 	fs::path p = leadPersistor.sPath;
 	// if parent_path is empty then file will be saved in current directory
-	if ((p.parent_path().empty() == false) && (!fs::exists(p.parent_path())) && (!fs::create_directories(p.parent_path()))) {
-		fatal(ISSET_ERROR_PERSISTOR_SAVE_FAILED,
-			"Unable to fix missing path for persistor file");
+	if (p.parent_path().empty() == false) {
+		if (!fs::exists(p.parent_path())) {
+			if (!fs::create_directories(p.parent_path())) {
+				fatal(ISSET_ERROR_PERSISTOR_SAVE_FAILED,
+						"Unable to create missing directories in path of persistor file\n" + p.parent_path().string());
+			}
+		}
 	}
 
 	// Path OK so save the Profile(s)
@@ -709,4 +714,3 @@ void ISDevCliConfigCreate::storeIonicProfile(ISAgent * pAgent,
 			<< endl
 	;
 }
-

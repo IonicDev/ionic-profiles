@@ -14,6 +14,9 @@
 #include "ISEnrollmentError.h"
 #include "Confirmation.h"
 
+#include "boost/filesystem.hpp"
+namespace fs = boost::filesystem;
+
 
 void ISDevCliConfigConvert::printConfigBody() {
 
@@ -76,7 +79,6 @@ void ISDevCliConfigConvert::getConfigFromFile() {
 	}
 }
 
-
 void ISDevCliConfigConvert::getConfigFromCommandLine() {
 	ISDevCliConfigSet::getConfigFromCommandLine();
 
@@ -97,7 +99,6 @@ void ISDevCliConfigConvert::getConfigFromCommandLine() {
 				vm[PROFILE_OPTION_TARGET_PERSISTOR_AESGCM_ADATA].as<string>();
 	}
 }
-
 
 void ISDevCliConfigConvert::printUsageHeader() {
 	cout << PROFILES_CONVERT_DESCRIPTION << endl;
@@ -212,6 +213,45 @@ void ISDevCliConfigConvert::convertProfiles(ISAgent *pAgent) {
 	delete (persistor); // Heap alloc in abstracted function
 }
 
+void ISDevCliConfigConvert::persistorPathFixer() {
+	// use default persistor
+	if (targetPersistor.sType == PERSISTOR_TYPE_DEFAULT) {
+		if (nVerbose >= 1) {
+			cout << LINE_LEAD << "Using default persistor" << endl << endl;
+		}
+
+		if (sPlatform == PLATFORM_WINDOWS) {
+#if defined(_WIN32) || defined(_WIN64)
+			ISAgentDeviceProfilePersistorWindows* pWinPersistor = new ISAgentDeviceProfilePersistorWindows();
+			if (targetPersistor.sVersion != "") {
+				pWinPersistor->setFormatVersionOverride(targetPersistor.sVersion);
+			}
+			if (targetPersistor.sPath.empty()) {
+				targetPersistor.sPath = pWinPersistor->getDefaultFilePath();
+			}
+#else
+			fatal(ISSET_ERROR_INVALID_PERSISTOR,
+					"Invalid state. Can not use Windows persistor on a non-Windows system");
+#endif
+		}
+	}
+
+	// Before we try to have the SDK save the profiles
+	//   We have to confirm the path to the persistor file Exists
+	//   OR we have to create that missing path
+	fs::path p = targetPersistor.sPath;
+	// if parent_path is empty then file will be saved in current directory
+	if (p.parent_path().empty() == false) {
+		if (!fs::exists(p.parent_path())) {
+			if (!fs::create_directories(p.parent_path())) {
+				fatal(ISSET_ERROR_PERSISTOR_SAVE_FAILED,
+						"Unable to create missing directories in path of persistor file\n"
+								+ p.parent_path().string());
+			}
+		}
+	}
+}
+
 // Helper function to convert profile persistor type
 // Uses information gathered in convertProfiles()
 void ISDevCliConfigConvert::convertHelper(
@@ -233,6 +273,9 @@ void ISDevCliConfigConvert::convertHelper(
 						" original versions as you long as you do not override their file path.";
 
 		if ((bQuiet) || (question_yesno(stringStream.str()))) {
+
+			persistorPathFixer();
+
 			cout << "Converting all profiles to '" << targetPersistor.sType
 					<< "' Persistor in '" << targetPersistor.sPath << "'"
 					<< endl;
@@ -281,6 +324,8 @@ void ISDevCliConfigConvert::convertHelper(
 		pAgent->addProfile(profileToConvert);
 
 	}
+
+	persistorPathFixer();
 
 	// Save changes
 	nErr = pAgent->saveProfiles(*persistor);
