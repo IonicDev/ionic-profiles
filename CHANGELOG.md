@@ -1,5 +1,16 @@
 # IonicTools Changelog
 
+## Version 2.3.0
+
+#### Added
+   Add support for kns during enrollment
+   Add support for Ionic Authentication enrollment
+
+#### Updated
+   Edit docker build scripts for use with GitHub ionic-profiles repository
+   Move .h files from src to new include directory
+   Verify/create folder for default persistor type (Windows, MacOS)
+
 ## Version 2.2.1
 
 #### Fixed
