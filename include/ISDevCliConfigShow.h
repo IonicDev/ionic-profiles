@@ -14,8 +14,8 @@ class ISDevCliConfigShow : public ISDevCliConfig {
 		const char *const PROFILES_SHOW_DESCRIPTION	= "Show active profile";
 
 
-		ISDevCliConfigShow(int action = PROFILE_COMMAND_SHOW, int verbosity = 0 ) :
-				ISDevCliConfig( action, verbosity ) {
+		ISDevCliConfigShow(int verbosity = 0 ) :
+				ISDevCliConfig(verbosity) {
 		}
 
 		~ISDevCliConfigShow() {}

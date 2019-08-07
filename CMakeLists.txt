@@ -21,10 +21,20 @@ endif()
 include_directories(${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
-include_directories("$ENV{IONIC_SDK_PATH}/ISAgentSDKCpp/Include")
-link_directories("$ENV{IONIC_SDK_PATH}/ISAgentSDKCpp/Lib/${platform}/Release/${architecture}")
+# include versioning macro "IonicAppVersion"
+include (Version.cmake)
+IonicAppVersion()
 
-include_directories("src")
+if (DEFINED DONTNAMESDKCPP)
+    include_directories("$ENV{IONIC_SDK_PATH}/ISAgentSDK/Include")
+    link_directories("$ENV{IONIC_SDK_PATH}/ISAgentSDK/Lib/${platform}/Release/${architecture}")
+else()
+    include_directories("$ENV{IONIC_SDK_PATH}/ISAgentSDKCpp/Include")
+    link_directories("$ENV{IONIC_SDK_PATH}/ISAgentSDKCpp/Lib/${platform}/Release/${architecture}")
+endif()
+
+include_directories(include)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
 
 # build ionic-profiles
 file(GLOB IONIC_REGISTER_SOURCE src/*.cpp )

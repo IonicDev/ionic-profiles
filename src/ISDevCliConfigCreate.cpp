@@ -1,4 +1,4 @@
-/* Copyright 2018 Ionic Security Inc. All Rights Reserved.
+/* Copyright 2018 - 2019 Ionic Security Inc. All Rights Reserved.
  * Unauthorized use, reproduction, redistribution, modification, or disclosure is strictly prohibited.
  */
 
@@ -10,6 +10,8 @@
 
 #include "ISHTTP.h"
 #include "URICoding.h"
+#include "ISDevRest.h"
+#include "ISDevGetSensitiveInput.h"
 
 #include "ISDevCliConfigCreate.h"
 
@@ -18,7 +20,6 @@
 
 #include "boost/filesystem.hpp"
 namespace fs = boost::filesystem;
-
 
 void ISDevCliConfigCreate::printConfigBody() {
 
@@ -31,6 +32,11 @@ void ISDevCliConfigCreate::printConfigBody() {
 	cout	<< LINE_LEAD << PROFILE_OPTION_ASSERTION_FILEPATH << "         "
 			<< COLON_SPACE << sAssertionFilePath
 			<< endl;
+	if (!bValidateAssertion) {
+		cout	<< LINE_LEAD << PROFILE_OPTION_NO_VALIDATE_ASSERTION << "  "
+				<< COLON_SPACE << true
+				<< endl;
+	}
 	cout	<< LINE_LEAD << PROFILE_OPTION_ES_URL << "                 "
 			<< COLON_SPACE << sEsGenAssnUrl
 			<< endl;
@@ -68,6 +74,9 @@ void ISDevCliConfigCreate::getConfigFromFile() {
 		sAssertionFilePath = *op;
 	}
 
+	// set bValidateAssertion to true iff no-validate-assertion is not specified
+	bValidateAssertion = !jsonConfig.get_optional<bool>(PROFILE_OPTION_NO_VALIDATE_ASSERTION);
+
 	// check for es-url option
 	if ((op = jsonConfig.get_optional<string>(PROFILE_OPTION_ES_URL))) {
 		sEsGenAssnUrl = *op;
@@ -98,12 +107,18 @@ void ISDevCliConfigCreate::getConfigFromCommandLine() {
 		sAuthMethod = vm[PROFILE_OPTION_ENROLLMENT_METHOD].as<string>();
 	}
 
+	if (bQuiet && (0 == sAuthMethod.compare(PROFILE_OPTION_EMAIL))) {
+		fatal(ISSET_ERROR_ARG_CONFLICT,
+				"Conflicting arg: quiet mode not allowed with email authentication method");
+	}
+
 	if (vm.count(PROFILE_OPTION_KEYSPACE)) {
 		sKeyspace = vm[PROFILE_OPTION_KEYSPACE].as<string>();
 	}
 	if (vm.count(PROFILE_OPTION_ASSERTION_FILEPATH)) {
 		sAssertionFilePath = vm[PROFILE_OPTION_ASSERTION_FILEPATH].as<string>();
 	}
+	bValidateAssertion = !vm.count(PROFILE_OPTION_NO_VALIDATE_ASSERTION);
 	if (vm.count(PROFILE_OPTION_ES_URL)) {
 		sEsGenAssnUrl = vm[PROFILE_OPTION_ES_URL].as<string>();
 	// only check for es-headless-url if no es-url
@@ -116,6 +131,15 @@ void ISDevCliConfigCreate::getConfigFromCommandLine() {
 	if (vm.count(PROFILE_OPTION_API_URL)) {
 		sApiUrl = vm[PROFILE_OPTION_API_URL].as<string>();
 	}
+	if (vm.count(PROFILE_OPTION_EMAIL)) {
+		sEmailAddress = vm[PROFILE_OPTION_EMAIL].as<string>();
+	}
+	if (vm.count(PROFILE_OPTION_IONIC_USER_NAME)) {
+		sIonicUserName = vm[PROFILE_OPTION_IONIC_USER_NAME].as<string>();
+	}
+	if (vm.count(PROFILE_OPTION_IONIC_PASSWORD)) {
+		sIonicPassword = vm[PROFILE_OPTION_IONIC_PASSWORD].as<string>();
+	}
 	if (vm.count(PROFILE_OPTION_DEVICE_NAME)) {
 		sDeviceName = vm[PROFILE_OPTION_DEVICE_NAME].as<string>();
 	}
@@ -125,12 +149,19 @@ void ISDevCliConfigCreate::getConfigFromCommandLine() {
 		bSetActive = vm[PROFILE_OPTION_SET_ACTIVE_CAPA].as<bool>();
 	}
 
-	if (sAuthMethod.compare(authMethodString[ENROLL_ASSERT]) == 0
-			&& vm.count(PROFILE_OPTION_ASSERTION_FILEPATH)) {
-		sAssertionFilePath =
-				vm[PROFILE_OPTION_ASSERTION_FILEPATH].as<string>();
-		sAssertionData = getAssertionFromFile(
-				sAssertionFilePath);
+	if (sAuthMethod.compare(authMethodString[ENROLL_ASSERT]) == 0) {
+		// Check for CLI param for assertion-file
+		if (vm.count(PROFILE_OPTION_ASSERTION_FILEPATH)) {
+			sAssertionFilePath =
+					vm[PROFILE_OPTION_ASSERTION_FILEPATH].as<string>();
+		}
+
+		// Check if assertion-file set from config file or CLI
+		//   and get assertion data from file if so
+		if (!sAssertionFilePath.empty()) {
+			sAssertionData = getAssertionFromFile(
+					sAssertionFilePath);
+		}
 	}
 }
 
@@ -149,10 +180,10 @@ void ISDevCliConfigCreate::printUsagePersistor() {
 void ISDevCliConfigCreate::printUsageEnd() {
 	cout << "\t" << PROFILES_PUBKEY_URL_DEPRECATED_LINE << endl;
 	cout << "\t" << PROFILES_API_URL_DEPRECATED_LINE << endl;
-	cout << "\t" << PROFILES_DEVICE_NAME_LINE;
-	if (nProfileCommand == PROFILE_COMMAND_CREATE) {
-		cout << " "  << PROFILES_SET_ACTIVE_LINE;
-	}
+	cout << "\t" << PROFILES_EMAIL_LINE;
+	cout << "\t" << PROFILES_IONIC_AUTHENTICATION_LINE;
+	cout << " "  << PROFILES_DEVICE_NAME_LINE;
+	cout << " "  << PROFILES_SET_ACTIVE_LINE;
 	cout << endl;
 
 	ISDevCliConfig::printUsageEnd();
@@ -164,9 +195,9 @@ void ISDevCliConfigCreate::buildOptions() {
 
 	auth_options_list.add_options()
 		(PROFILE_OPTION_AUTH_METHOD, po::value<string>(),
-			"authentication method \n(email, assertion)\n")
+			"authentication method \n(email, ionic-authentication, assertion)\n")
 		(PROFILE_OPTION_ENROLLMENT_METHOD, po::value<string>(),
-			"DEPRECATED: authentication method \n(email, assertion)\n")
+			"DEPRECATED: authentication method \n(email, ionic-authentication, assertion)\n")
 	;
 
 	keyspace_options_list.add_options()
@@ -174,6 +205,8 @@ void ISDevCliConfigCreate::buildOptions() {
 			"keyspace for enrollment\n")
 		(PROFILE_OPTION_ASSERTION_FILEPATH, po::value<string>(),
 			"path to assertion file for enrollment\n")
+		(PROFILE_OPTION_NO_VALIDATE_ASSERTION, po::value<bool>()->zero_tokens(),
+			"don't validate the assertion file before sending the enrollment request (default is to validate)\n")
 		(PROFILE_OPTION_ES_URL, po::value<string>(),
 			"enrollment service url\n")
 		(PROFILE_OPTION_ES_HEADLESS_URL, po::value<string>(),
@@ -187,6 +220,18 @@ void ISDevCliConfigCreate::buildOptions() {
 		(PROFILE_OPTION_API_URL, po::value<string>(),
 			"DEPRECATED: URL for tenant’s API server.\n"
 			"This overrides the value returned from the registration endpoint\n")
+	;
+
+	email_address_options_list.add_options()
+		(PROFILE_OPTION_EMAIL,	po::value<string>()->implicit_value(""),
+			"For scripting, provide email address\n")
+	;
+
+	ionic_authentication_options_list.add_options()
+		(PROFILE_OPTION_IONIC_PASSWORD, po::value<string>()->implicit_value(""),
+			"For scripting, provide Ionic password\n")
+		(PROFILE_OPTION_IONIC_USER_NAME, po::value<string>()->implicit_value(""),
+			"For scripting, provide Ionic user name\n")
 	;
 
 	device_name_options_list.add_options()
@@ -207,37 +252,128 @@ void ISDevCliConfigCreate::buildOptionsList() {
 		.add(keyspace_options_list)
 		.add(persistor_options_list)
 		.add(deprecated_options_list)
+		.add(email_address_options_list)
+		.add(ionic_authentication_options_list)
 		.add(device_name_options_list)
 		.add(set_active_options_list)
 		.add(miscellaneous_options_list)
 	;
 }
 
-void ISDevCliConfigCreate::validateConfig() {
+bool ISDevCliConfigCreate::getRegisterURL(string& registerURL, string& errorMessage) const {
+	// Get the keyspace and enrollment URLs. The keyspace URL is
+	// initialized while retrieving the enrollment URL.
+	string keyspaceURL;
+	string enrollmentURL;
+	if (!getEnrollmentURL(sKeyspace, keyspaceURL, enrollmentURL, errorMessage)) {
+		return false;
+	}
 
-	ISDevCliConfig::validateConfig();
+	// Make sure the enrollment URL could end in "/register", based on its length
+	string slashRegister("/register");
+	if (enrollmentURL.empty()) {
+		errorMessage.assign("enrollment URL from " + keyspaceURL + " is empty");
+		return false;
+	}
+	if (enrollmentURL.length() < slashRegister.length()) {
+		errorMessage.assign("enrollment URL [" + enrollmentURL + "] from " + keyspaceURL + " should end in \"/register\"");
+		return false;
+	}
+
+	// Make sure the enrollment URL actually does end in "/register".
+	// It is safe to start a substring call with the difference between
+	// the length of enrollmentURL and that of "/register", because the
+	// result of that subtraction is positive.
+	size_t baseUrlEndPos = enrollmentURL.length() - slashRegister.length();
+	if (enrollmentURL.substr(baseUrlEndPos, slashRegister.length()) != slashRegister) {
+		errorMessage.assign("enrollment URL [" + enrollmentURL + "] from " + keyspaceURL + " should end in \"/register\"");
+		return false;
+	}
+
+	// Construct the identity source URL, and use it to get a map of /register URLs
+	string identitySourcesURL(enrollmentURL.substr(0, baseUrlEndPos) + "/identity_sources");
+	string identitySourceType; // Set to  "SAML", "LOUDEMAIL" or "IDC", then passed to getRegisterURLs
+	string defaultName;
+	string globalDefaultName;
+	std::map<string, string> registerURLs;
+	if (sAuthMethod.compare(authMethodString[ENROLL_ASSERT]) == 0) {
+		identitySourceType.assign("SAML");
+	}
+	if (sAuthMethod.compare(authMethodString[ENROLL_EMAIL]) == 0) {
+		identitySourceType.assign("LOUDEMAIL");
+	}
+	if (sAuthMethod.compare(authMethodString[ENROLL_IONIC_AUTHENTICATION]) == 0) {
+		identitySourceType.assign("IDC");
+	}
+	if (identitySourceType.empty()) {
+		errorMessage.assign(
+		  PROFILE_OPTION_AUTH_METHOD + string(" or ") + PROFILE_OPTION_ENROLLMENT_METHOD +
+		  string(" must be set to ") + authMethodString[ENROLL_ASSERT] + string(", ") +
+		  authMethodString[ENROLL_IONIC_AUTHENTICATION] + string(" or ") +
+		  authMethodString[ENROLL_EMAIL] + string(" in order to create a profile without providing option --") +
+		  PROFILE_OPTION_ES_URL
+		);
+		return false;
+	}
+	if (!getRegisterURLs(identitySourcesURL, identitySourceType, registerURLs, defaultName, globalDefaultName, errorMessage)) {
+		return false;
+	}
+
+	// Use the default registerURL, if available.
+	if (defaultName.empty()) {
+		errorMessage.assign("No default URL was listed for " + identitySourceType + " in response to GET from " + identitySourcesURL);
+		return false;
+	}
+
+	// Check for the internal error that defaultName was set but is not a key!
+	auto it = registerURLs.find(defaultName);
+	if (it == registerURLs.end()) {
+		errorMessage.assign("Internal error finding uri with name [" + defaultName + "] under the response from " + identitySourcesURL);
+	}
+
+	// It is finally safe to assign registerURL
+	registerURL.assign(it->second);
+	return true;
+}
+
+void ISDevCliConfigCreate::validateConfig() {
 
 	// 'Create'-specific checks
 
-	if (sKeyspace == "") {
+	if (sKeyspace.empty()) {
 		fatal(ISSET_ERROR_MISSING_REQUIRED_ARG,
 				"Missing arg: '" + (string)PROFILE_OPTION_KEYSPACE + "'");
 	}
 	// If assertion method, assertion file is required
 	if (sAuthMethod.compare(authMethodString[ENROLL_ASSERT]) == 0) {
-		if (sEsGenAssnUrl == "") {
-			fatal(ISSET_ERROR_MISSING_REQUIRED_ARG,
-					"Missing arg: '" + (string)PROFILE_OPTION_ES_URL + "'");
-		}
-		if (sAssertionFilePath == "") {
+		if (sAssertionFilePath.empty()) {
 			fatal(ISSET_ERROR_MISSING_REQUIRED_ARG,
 					"Missing arg: '" + (string)PROFILE_OPTION_ASSERTION_FILEPATH + "'");
 		}
-		if (sAssertionData == "") {
+		string sEsUrlFromAssertion;
+		if (bValidateAssertion) {
+			ISDevUtils::validateAssertion(sAssertionFilePath, sEsGenAssnUrl, sEsUrlFromAssertion); // also read es-url from assertion file
+		} else {
+			ISDevUtils::readEsUrlFromAssertionFile(sAssertionFilePath, sEsUrlFromAssertion);
+		}
+		if (sEsGenAssnUrl.empty() && !sEsUrlFromAssertion.empty()) {
+			if (nVerbose > 1) {
+				cout << "Using " << PROFILE_OPTION_ES_URL << " " << sEsUrlFromAssertion << " from assertion file." << endl;
+			}
+			sEsGenAssnUrl = sEsUrlFromAssertion;
+		}
+		if (sEsGenAssnUrl.empty()) {
+			fatal(ISSET_ERROR_MISSING_REQUIRED_ARG,
+					"Missing arg: '" + (string)PROFILE_OPTION_ES_URL + "'");
+		}
+		if (sAssertionData.empty()) {
 			fatal(ISSET_ERROR_ASSERTIONFILE_LOAD_FAILED,
 					"Failed to load assertion data");
 		}
 	}
+
+	// keep after Create specific checks
+	ISDevCliConfig::validateConfig();
 
 }
 
@@ -254,7 +390,7 @@ string ISDevCliConfigCreate::getAssertionFromFile(string sAssertionFilePath) {
 	}
 	if (sAssertionData.size() == 0) {
 		fatal(ISSET_ERROR_ASSERTIONFILE_LOAD_FAILED,
-				"Failed to load assertion file");
+				"Failed to load assertion data from file: " + sAssertionFilePath);
 	}
 
 	return sAssertionData;
@@ -276,9 +412,9 @@ void ISDevCliConfigCreate::performGenAssnDeviceEnrollment(ISAgent *pAgent) {
 	pAgent->initializeWithoutProfiles();
 
 	// perform headless device enrollment
-	getIonicAuthentication(sToken, sUidauth);
+	getAuthentication(sToken, sUidauth);
 	if (nVerbose >= 1) {
-		cout << LINE_LEAD << "Ionic Authentication: " << sUidauth << endl;
+		cout << LINE_LEAD << "Authentication: " << sUidauth << endl;
 	}
 
 	getEnrollmentServicePublicKey(sEsPublicKeyBase64);
@@ -286,52 +422,103 @@ void ISDevCliConfigCreate::performGenAssnDeviceEnrollment(ISAgent *pAgent) {
 			deviceProfile);
 	storeIonicProfile(pAgent, deviceProfile);
 
+	// Confirm functional new registration.
+	if (nVerbose >= 1) {
+		cout << "Confirm functional new registration" << endl;
+	}
 	ISAgentGetResourcesRequest::Resource reqIn =
 			ISAgentGetResourcesRequest::Resource();
-	ISAgentGetResourcesResponse* responseOut =
-			new ISAgentGetResourcesResponse();
-	int result = pAgent->getResource(reqIn, *responseOut);
-	int result2 = pAgent->getResource(reqIn, *responseOut);
+	ISAgentGetResourcesResponse responseOut;
 
-	if (result != ISAGENT_OK && result2 != ISAGENT_OK) {
-		fatal(ISSET_ERROR_CONFIRMATION_FAILED,
-				"Failed to confirm functional new registration.");
+	// Make upto 2 tries to get successful response from back end as 1st try may be too quick
+	int result = pAgent->getResource(reqIn, responseOut);
+	if (result != ISAGENT_OK ) {
+		int result2 = pAgent->getResource(reqIn, responseOut);
+		if (result2 != ISAGENT_OK) {
+			fatal(ISSET_ERROR_CONFIRMATION_FAILED,
+					"Failed to confirm functional new registration.");
+		} else if (nVerbose >= 1) {
+			cout << "Confirmed registration on 2nd try" << endl;
+		}
+	} else if (nVerbose >= 1) {
+		cout << "Confirmed registration on 1st try" << endl;
 	}
 }
 
 string ISDevCliConfigCreate::emailRequestBody() {
-	string sEmailAddress;
 
-	cout << "\nEnter email address: ";
-	getline(cin, sEmailAddress);
+	while (sEmailAddress.empty()) {
+		cout << "\nPlease enter email address: ";
+		getline(cin, sEmailAddress);
+	}
 
 	return "email=" + UriEncode(sEmailAddress);
+}
+
+string ISDevCliConfigCreate::ionicAuthenticationRequestBody() {
+	while (sIonicUserName.empty()) {
+		cout << "\nEnter your Ionic user name: ";
+		getline(cin, sIonicUserName);
+	}
+	while (sIonicPassword.empty()) {
+		// Try to hide input when getting the user's password.
+		string errorMessage;
+		bool gotPassword = getSensitiveInput("\nEnter your Ionic password", sIonicPassword, errorMessage);
+		if ((nVerbose >= 1) && !errorMessage.empty()) {
+			cout <<	"[+] Recoverable error was encountered while hiding password as it is entered on the console: " + errorMessage << endl;
+		}
+		cout << endl; // Newline was one of the hidden characters
+
+		// getSensitiveInput() can fail if the terminal is not
+		// what ionic-profiles is compiled for, such as a git
+		// bash terminal rather than a DOS terminal on
+		// Windows. If such failure was detected, the fallback
+		// is to let the password be echoed.
+		if (!gotPassword) {
+			cout << "Enter your Ionic password (NOTE - it will echo to the screen): ";
+			getline(cin, sIonicPassword);
+		}
+	}
+	return "username=" + UriEncode(sIonicUserName) + "&password=" + UriEncode(sIonicPassword);
 }
 
 string ISDevCliConfigCreate::samlRequestBody() {
 	return "SAMLResponse=" + UriEncode(sAssertionData);
 }
 
-void ISDevCliConfigCreate::getIonicAuthentication(string & sToken,
+void ISDevCliConfigCreate::getAuthentication(string & sToken,
 		string & sUidauth) {
 
 	if (nVerbose >= 1) {
 		cout	<< endl
-				<< "[+] Getting Ionic Auth from Enrollment Service"
+				<< "[+] Getting authentication from Enrollment Service"
 				<< endl
 		;
 	}
 
-	// Check ES Url
-	while (sEsGenAssnUrl == "") {
-		if (bQuiet) {
-			// Quiet Mode: Report error missing required ES Url arg
-			fatal(ISSET_ERROR_MISSING_REQUIRED_ARG,
-				"Quiet mode: Unable to complete request, please provide es-url setting the appropriate enrollment URL");
-		} else {
-			// Interactive Mode: Request User enter ES Url
-			cout << "Please provide the appropriate enrollment URL: " << endl;
-			getline(cin, sEsGenAssnUrl);
+	if (sEsGenAssnUrl.empty()) {
+		string registerURL;
+		string errorMessage;
+		if (!getRegisterURL(registerURL, errorMessage)) {
+			if (bQuiet) {
+				// Quiet Mode: Report error missing
+				// required ES Url arg
+				string fatalMessage("Quiet mode: could not construct " + string(PROFILE_OPTION_ES_URL) + ": " + errorMessage);
+				fatal(ISSET_ERROR_MISSING_REQUIRED_ARG, fatalMessage.c_str());
+			} else {
+				// Interactive Mode: Note the error
+				// and request that the user enter the
+				// ES Url
+				if (nVerbose > 1) {
+					cout << "Encountered an error constructing " << PROFILE_OPTION_ES_URL << ": " << errorMessage << endl;
+				}
+				cout << "Please provide the appropriate enrollment URL: " << endl;
+				getline(cin, registerURL);
+			}
+		}
+		sEsGenAssnUrl = registerURL;
+		if (nVerbose > 1) {
+			cout << "Using " << PROFILE_OPTION_ES_URL << " " << sEsGenAssnUrl << "." << endl;
 		}
 	}
 
@@ -345,6 +532,15 @@ void ISDevCliConfigCreate::getIonicAuthentication(string & sToken,
 		} else {
 			// Interactive mode: build email request body
 			sBody = emailRequestBody();
+		}
+	} else if (sAuthMethod.compare(authMethodString[ENROLL_IONIC_AUTHENTICATION]) == 0) {
+		if (bQuiet && (sIonicUserName.empty() || sIonicPassword.empty())) {
+			// Quiet mode: Unable to complete Ionic authentication enrollment since user input required
+			fatal(ISSET_ERROR_ENROLLMENT_REQUEST_FAILED,
+				"Quiet mode: Unable to complete Ionic Authenication as user input is required");
+		} else {
+			// Interactive mode: build Ionic authentication request body
+			sBody = ionicAuthenticationRequestBody();
 		}
 	} else {
 		// Assertion enrollment: build assertion request body
@@ -396,11 +592,13 @@ void ISDevCliConfigCreate::getIonicAuthentication(string & sToken,
 
 	// Extract ionic assertion from headers
 	if (sAuthMethod.compare(authMethodString[ENROLL_EMAIL]) == 0) {
-		cout << "\nA Registration Code has been sent to your email.";
-		cout << "\nEnter Registration Code: ";
+		cout << endl;
+		cout << "A Registration Code has been sent to your email: " << sEmailAddress << endl;
+		cout << "Enter Registration Code: ";
 		getline(cin, sToken);
 	} else {
-		//
+		// This branch works for authenticating with either
+		// Ionic authentication or SAML assertions
 		sToken = httpResponse.getHeader("X-Ionic-Reg-Stoken");
 		if (nVerbose >= 2) {
 			cout << "STOKEN: " << sToken << endl;
@@ -585,6 +783,16 @@ void ISDevCliConfigCreate::storeIonicProfile(ISAgent * pAgent,
 		cout	<< endl << "[+] Storing Ionic Device Profile"
 				<< endl
 		;
+		cout << "Device profile data: \n"
+		<< "\n\tisLoaded: " << deviceProfileIn.isLoaded()
+		<< "\n\tgetName: " << deviceProfileIn.getName()
+		<< "\n\tgetCreationTimestampSecs: " << deviceProfileIn.getCreationTimestampSecs()
+		<< "\n\tgetDeviceId: " << deviceProfileIn.getDeviceId()
+		<< "\n\tgetKeySpace: " << deviceProfileIn.getKeySpace()
+		<< "\n\tgetServer: " << deviceProfileIn.getServer()
+		<< "\n\tgetAesCdIdcProfileKey: " << "Not showing IDCstring"
+		<< "\n\tgetAesCdEiProfileKey: " << "Not showing EIstring"
+		<<  endl;
 	}
 
 	// use plaintext persistor

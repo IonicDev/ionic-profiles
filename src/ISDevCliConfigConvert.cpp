@@ -1,4 +1,4 @@
-/* Copyright 2018 Ionic Security Inc. All Rights Reserved.
+/* Copyright 2018-2019 Ionic Security Inc. All Rights Reserved.
  * Unauthorized use, reproduction, redistribution, modification, or disclosure is strictly prohibited.
  */
 
@@ -153,10 +153,10 @@ void ISDevCliConfigConvert::buildOptionsList() {
 
 void ISDevCliConfigConvert::validateConfig() {
 
+	// 'Convert'-specific checks
+
 	// Note: Skip past ISDevCliConfigSet::validateConfig since device id doesn't need to be defined
 	ISDevCliConfig::validateConfig();
-
-	// 'Convert'-specific checks
 
 	validatePersistor(&targetPersistor);
 
@@ -171,7 +171,7 @@ void ISDevCliConfigConvert::invokeAction(ISAgent *pAgent) {
 void ISDevCliConfigConvert::convertProfiles(ISAgent *pAgent) {
 
 	// Initialize the agent and retrieve Persistor for the according type and path
-	ISAgentDeviceProfilePersistor *persistor = initWithPersistor(pAgent, leadPersistor);
+	std::unique_ptr<ISAgentDeviceProfilePersistor> persistor = initWithPersistor(pAgent, leadPersistor);
 	if (persistor == nullptr) {
 		fatal(ISSET_ERROR_INVALID_PERSISTOR,
 			"[!FATAL] Invalid type of Persistor; failed to initialize Ionic Agent.");
@@ -179,6 +179,16 @@ void ISDevCliConfigConvert::convertProfiles(ISAgent *pAgent) {
 
 	cout << "---> Loading profiles in '" << leadPersistor.sType
 			<< "' Persistor in '" << leadPersistor.sPath << "'" << endl;
+
+	// check if file exists
+	if ((leadPersistor.sPath.empty()) || !fs::exists(leadPersistor.sPath)) {
+		//error on no file
+		fatal(ISSET_ERROR_PERSISTOR_LOAD_FAILED,
+			"[!FATAL] Convert profile could not find file for source Persistor type (" +
+			leadPersistor.sType + ") in given path (" +
+			leadPersistor.sPath +
+			"). Check persistor-path.");
+	}
 
 	// Get a vector of profiles for this persistor at this path
 	vector<ISAgentDeviceProfile> vecProfilesOut;
@@ -207,10 +217,9 @@ void ISDevCliConfigConvert::convertProfiles(ISAgent *pAgent) {
 			return;
 		}
 	}
+	infile.close();
 
 	convertHelper(vecProfilesOut, sActiveDeviceIdOut);
-
-	delete (persistor); // Heap alloc in abstracted function
 }
 
 void ISDevCliConfigConvert::persistorPathFixer() {
@@ -261,7 +270,7 @@ void ISDevCliConfigConvert::convertHelper(
 	// Convert the profiles
 	// Initialize new agent and retrieve new Persistor to convert to
 	ISAgent *pAgent = new ISAgent();
-	ISAgentDeviceProfilePersistor *persistor = initWithPersistor(pAgent, targetPersistor);
+	std::unique_ptr<ISAgentDeviceProfilePersistor> persistor = initWithPersistor(pAgent, targetPersistor);
 	int nErr;
 
 	// See which device profile to convert or ALL device profiles
@@ -303,33 +312,32 @@ void ISDevCliConfigConvert::convertHelper(
 				<< targetPersistor.sPath << "'" << endl;
 
 		// Retrieve the profile according to this Device Id
-		ISAgentDeviceProfile profileToConvert;
+		ISAgentDeviceProfile *profileToConvert = nullptr;
 		for (vector<ISAgentDeviceProfile>::size_type i =
 				vecProfilesOut.size() - 1;
 				i != (vector<ISAgentDeviceProfile>::size_type) -1; i--) {
 			if (sDeviceId.compare(vecProfilesOut[i].getDeviceId())
 					== 0) {
-				profileToConvert = vecProfilesOut[i];
+				profileToConvert = new ISAgentDeviceProfile(vecProfilesOut[i]);
 				break;
 			}
 		}
 
-		// Make sure we found the right profile
-		if (profileToConvert.getDeviceId().compare(sDeviceId) != 0) {
+		// Make sure we found a/the right profile
+		if ((profileToConvert == nullptr)
+				|| (profileToConvert->getDeviceId().compare(sDeviceId) != 0)) {
 			fatal(ISSET_ERROR_PERSISTOR_SAVE_FAILED,
 				"[!FATAL] Could not find a profile with that ID.");
 		}
 
 		// Add the profile to the agent that had been initialized with new persistor
-		pAgent->addProfile(profileToConvert);
-
+		pAgent->addProfile(*profileToConvert);
 	}
 
 	persistorPathFixer();
 
 	// Save changes
 	nErr = pAgent->saveProfiles(*persistor);
-	delete(pAgent);
 
 	if (nErr != ISAGENT_OK) {
 		fatal(ISSET_ERROR_PERSISTOR_SAVE_FAILED,

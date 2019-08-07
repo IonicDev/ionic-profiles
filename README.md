@@ -2,7 +2,7 @@
 
 ```
 #####
-# Copyright 2017-2018 Ionic Security Inc. All Rights Reserved.
+# Copyright 2017-2019 Ionic Security Inc. All Rights Reserved.
 # Unauthorized use, reproduction, redistribution, modification, or disclosure is strictly prohibited.
 #####
 ```
@@ -22,7 +22,7 @@ See the documentation for usage information and pre-requisite steps.
 #### Inside Docker
 1. Download and unpack the Ionic C++ SDK for Linux.
 2. Ensure you have the environment variable `$IONIC_SDK_PATH` set on your host system to where the unpacked Linux SDK is located, e.g. the path
- `$IONIC_SDK_PATH/ISAgentSDK/Lib/Linux` should exist for example.
+ `$IONIC_SDK_PATH/ISAgentSDKCpp/Lib/Linux` should exist for example.
 3. Run `./docker-build.sh` for it to be built for a Linux x64 CentOS7 target within Docker and output written to `build-x86_64/`.
 
 Note that you can modify the `Dockerfile.cpp` and `docker-build.sh` scripts to build on other platforms as desired.
@@ -58,3 +58,22 @@ pushd $BOOST_ROOT && ./bootstrap.sh \
             --with-libraries=regex,system,filesystem,program_options,graph  && \
             ./b2 link=static && popd
 ```
+
+### Run Requirements
+haveged - Needed to prevent extensive delay when running IonicTools on headless Linux systems.
+
+### Preparation
+1. Install haveged
+
+```bash
+sudo yum -y install haveged
+```
+
+2. Start entropy daemon
+
+```bash
+sudo haveged -w 1024
+```
+
+
+

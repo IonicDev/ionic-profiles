@@ -22,8 +22,8 @@ class ISDevCliConfigDelete : public ISDevCliConfigSet {
 		        \n\t\t[--quiet] [--help]";
 
 
-		ISDevCliConfigDelete(int action = PROFILE_COMMAND_DELETE, int verbosity = 0 ) :
-				ISDevCliConfigSet( action, verbosity ) {
+		ISDevCliConfigDelete(int verbosity = 0 ) :
+				ISDevCliConfigSet(verbosity) {
 		}
 
 		~ISDevCliConfigDelete() {}
