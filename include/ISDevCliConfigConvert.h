@@ -1,4 +1,4 @@
-/* Copyright 2018 Ionic Security Inc. All Rights Reserved.
+/* Copyright 2018-2019 Ionic Security Inc. All Rights Reserved.
  * Unauthorized use, reproduction, redistribution, modification, or disclosure is strictly prohibited.
  */
 
@@ -25,9 +25,9 @@ class ISDevCliConfigConvert : public ISDevCliConfigSet {
 		const char *const TARGET_CONFIG_PATH_USAGE						= "[--target-config <PATH>]";
 
 
-		ISDevCliConfigConvert(int action = PROFILE_COMMAND_CONVERT, int verbosity = 0 ) :
+		ISDevCliConfigConvert(int verbosity = 0 ) :
 			targetPersistor{PERSISTOR_TYPE_DEFAULT},
-			ISDevCliConfigSet( action, verbosity ) {
+			ISDevCliConfigSet(verbosity) {
 		}
 
 		~ISDevCliConfigConvert() {}

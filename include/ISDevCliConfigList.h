@@ -13,8 +13,8 @@ class ISDevCliConfigList : public ISDevCliConfig {
 		const char *const PROFILES_LIST_DESCRIPTION	= "Display a list of profiles";
 
 
-		ISDevCliConfigList(int action = PROFILE_COMMAND_LIST, int verbosity = 0) :
-			ISDevCliConfig( action, verbosity )
+		ISDevCliConfigList(int verbosity = 0) :
+			ISDevCliConfig(verbosity)
 			{}
 
 		~ISDevCliConfigList() {}

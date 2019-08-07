@@ -1,4 +1,4 @@
-/* Copyright 2017-2018 Ionic Security Inc. All Rights Reserved.
+/* Copyright 2017-2019 Ionic Security Inc. All Rights Reserved.
  * Unauthorized use, reproduction, redistribution, modification, or disclosure is strictly prohibited.
  */
 
@@ -27,7 +27,13 @@ enum ISSetResponseType {
 	ISSET_ERROR_PERSISTOR_VERSION_LENGTH,
 	ISSET_ERROR_INVALID_PERSISTOR_VERSION,
 	ISSET_ERROR_CONFIRMATION_FAILED,
-	ISSET_ERROR_DEVICE_ID_NOTFOUND
+	ISSET_ERROR_DEVICE_ID_NOTFOUND,
+	ISSET_ERROR_INVALID_ES_URL,
+	ISSET_ERROR_LATE_WITH_ASSERTION,
+	ISSET_ERROR_EARLY_WITH_ASSERTION,
+	ISSET_ERROR_INVALID_PERSISTOR_PATH,
+	ISSET_ERROR_ARG_CONFLICT
 };
+// Developer Note: Verify test/args_test.py RETURN_CODES are kept in sync with ISSetResponseType when updated
 
 #endif // __IONIC_ENROLLMENTERROR_H

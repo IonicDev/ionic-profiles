@@ -1,4 +1,4 @@
-/* Copyright 2018 Ionic Security Inc. All Rights Reserved.
+/* Copyright 2018-2019 Ionic Security Inc. All Rights Reserved.
  * Unauthorized use, reproduction, redistribution, modification, or disclosure is strictly prohibited.
  */
 
@@ -29,9 +29,8 @@ void ISDevCliConfigShow::invokeAction(ISAgent *pAgent) {
 void ISDevCliConfigShow::showActiveProfile(ISAgent *pAgent) {
 
 	// Initialize the agent for the according Persistor for this type and path
-	ISAgentDeviceProfilePersistor *persistor = initWithPersistor(pAgent, leadPersistor);
+	std::unique_ptr<ISAgentDeviceProfilePersistor> persistor = initWithPersistor(pAgent, leadPersistor);
 	if (persistor == nullptr) {
-		delete (persistor); // Heap alloc in abstracted function
 		fatal(ISSET_ERROR_INVALID_PERSISTOR,
 				"[!FATAL] Invalid type of Persistor; failed to initialize Ionic Agent.");
 	}
@@ -53,7 +52,4 @@ void ISDevCliConfigShow::showActiveProfile(ISAgent *pAgent) {
 			"If you need to create a profile, use the create option. You can see all of your existing "
 			"profiles with the list option." << endl;
 	}
-
-	delete (persistor); // Heap alloc in abstracted function
-
 }

@@ -1,4 +1,4 @@
-/* Copyright 2018 Ionic Security Inc. All Rights Reserved.
+/* Copyright 2018-2019 Ionic Security Inc. All Rights Reserved.
  * Unauthorized use, reproduction, redistribution, modification, or disclosure is strictly prohibited.
  */
 
@@ -27,15 +27,25 @@ void ISDevCliConfigList::invokeAction(ISAgent *pAgent) {
 // List all profiles for a given type of persistor in a given persistor path
 void ISDevCliConfigList::listAllProfiles() {
 
-	// Get a vector of profiles for this persistor at this path
-	cout	<< "---> Getting profiles in '"	<<	leadPersistor.sType
-			<< "' Persistor in file '"		<<	leadPersistor.sPath	<<	"'"
+	// Get a vector of profiles for this persistor at this path. In
+	// the case of a default persistor, leadPersistor.sType does
+	// not name the persistor file and is left out of the status
+	// message.
+	if (leadPersistor.sPath.empty()) {
+		cout	<< "---> Getting profiles in '"	<<	leadPersistor.sType
+			<< "' Persistor"
 			<< endl;
+	}
+	else {
+		cout	<< "---> Getting profiles in '"	<<	leadPersistor.sType
+			<< "' Persistor in file '"	<<	leadPersistor.sPath	<<	"'"
+			<< endl;
+	}
 	vector<ISAgentDeviceProfile> vecProfilesOut = getVector();
 
 	if (vecProfilesOut.empty()) {
-		fatal(ISSET_ERROR_INVALID_PERSISTOR,
-			"[!FATAL] There are no profiles there of that Persistor type.");
+		cout << "No profiles were found of the requested persistor type." << endl;
+		exit(0);
 	} else {
 		// For each profile, show its name, deviceId, and server name
 		for (vector<ISAgentDeviceProfile>::size_type i =

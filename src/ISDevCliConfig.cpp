@@ -1,4 +1,4 @@
-/* Copyright 2017-2018 Ionic Security Inc. All Rights Reserved.
+/* Copyright 2017-2019 Ionic Security Inc. All Rights Reserved.
  * Unauthorized use, reproduction, redistribution, modification, or disclosure is strictly prohibited.
  */
 
@@ -8,9 +8,42 @@
 #include <fstream>
 #include <sstream>
 
+#include "version.h"
+
 #include "ISDevCliConfig.h"
 #include "ISDevUtils.h"
 #include "ISEnrollmentError.h"
+
+#include "boost/filesystem.hpp"
+namespace fs = boost::filesystem;
+
+
+const char *const PROFILES_USAGE_COMMANDS_STRING		=
+	"[[create] | list  | show | set | convert | delete | validate-assertion]";
+const char *const PROFILES_USAGE_PERSISTOR_LINE1		=
+	"[--persistor <PERSISTOR>] [--persistor-path <PATH>] [--persistor-password <PASSWORD>]";
+const char *const PROFILES_USAGE_PERSISTOR_LINE2		=
+	"[--persistor-aesgcm-key <KEY>] [--persistor-aesgcm-adata <AUTHDATA>]";
+const char *const PROFILES_USAGE_PERSISTOR_LINE3		=
+	"[--persistor-version <VERSION>]";
+const char *const PROFILES_USAGE_MISCELLANEOUS_STRING	=
+	"[--verbose <LEVEL>] [--quiet] [--help] [--version]";
+
+const char *const PROFILES_COMMAND_HELP_STRING =
+	"\tionic-profiles [create] - Create a profile - DEFAULT \
+	\n\t\tsee ionic-profiles create --help for options \
+	\n\n\tionic-profiles list - Display a list of profiles \
+	\n\t\tsee ionic-profiles list --help for options \
+	\n\n\tionic-profiles show - Show active profile \
+	\n\t\tsee ionic-profiles show --help for options \
+	\n\n\tionic-profiles set - Set active profile \
+	\n\t\tsee ionic-profiles set --help for options \
+	\n\n\tionic-profiles convert - Convert profile from one persistor type to another \
+	\n\t\tsee ionic-profiles convert --help for options \
+	\n\n\tionic-profiles delete - Delete a profile \
+	\n\t\tsee ionic-profiles delete --help for options \
+	\n\n\tionic-profiles validate-assertion - Validate an assertion file \
+	\n\t\tsee ionic-profiles validate-assertion --help for options\n";
 
 
 void ISDevCliConfig::printConfig() {
@@ -23,7 +56,7 @@ void ISDevCliConfig::printConfigHeader() {
 	cout	<< endl
 			<< "[+] EnrollmentConfig" << endl;
 	cout	<< "    Platform               : "	<< sPlatform << endl;
-	cout	<< "    " << profileCommandDescription[nProfileCommand]
+	cout	<< "    " << getCommandDescription()
 			<< endl;
 }
 
@@ -68,12 +101,10 @@ void ISDevCliConfig::printConfigEnd() {
 void ISDevCliConfig::parseConfigFile(string sConfigFilePath) {
 	ifstream file(sConfigFilePath.c_str());
 	if (file) {
-
 		// parse json string
 		try {
 			boost::property_tree::read_json(sConfigFilePath, jsonConfig);
 		} catch (boost::property_tree::json_parser_error& e) {
-			cout << e.what() << endl;
 			fatal(ISSET_ERROR_CONFIG_PARSE_FAILED,
 					"Failed to parse config file");
 		}
@@ -121,9 +152,16 @@ void ISDevCliConfig::getConfigFromFile() {
 
 void ISDevCliConfig::getConfigFromCommandLine() {
 
+	if (vm.count(PROFILE_OPTION_APP_VERSION)) {
+		printAppVersion();
+		if (argCount <= 2) {
+			// only asked for app version
+			exit(ISSET_SUCCESS);
+		}
+	}
+
 	if (vm.count(PROFILE_OPTION_HELP)) {
 		printUsage();
-		cout << usage << endl;
 		// If you've asked for help you've succeeded
 		exit(ISSET_SUCCESS);
 	}
@@ -152,13 +190,17 @@ void ISDevCliConfig::getConfigFromCommandLine() {
 	}
 }
 
+void ISDevCliConfig::printAppVersion() {
+	cout << IONIC_PROFILES_NAME << "  " << IONICTOOLS_APP_VERSION << endl;
+}
+
 
 void ISDevCliConfig::printUsageHeader() {
 	cout << IONIC_PROFILES_NAME << "  ";
-	if (nProfileCommand == PROFILE_COMMAND_NONE) {
+	if (isNoActionCommand()) {
 		cout << PROFILES_USAGE_COMMANDS_STRING;
 	} else {
-		cout << profileCommandName[nProfileCommand];
+		cout << getCommandName();
 	}
 	cout << "  " << CONFIG_PATH_USAGE;
 }
@@ -172,7 +214,7 @@ void ISDevCliConfig::printUsagePersistor() {
 
 void ISDevCliConfig::printUsageEnd() {
 	cout << "\t" << PROFILES_USAGE_MISCELLANEOUS_STRING << endl;
-	if (nProfileCommand == PROFILE_COMMAND_NONE) {
+	if (isNoActionCommand()) {
 		cout << PROFILES_COMMAND_HELP_STRING << endl;
 	}
 }
@@ -211,11 +253,13 @@ void ISDevCliConfig::buildOptions() {
 			"For scripting, fail on missing info\n")
 		(PROFILE_OPTION_HELP,
 				"Display Usage information\n")
+		(PROFILE_OPTION_APP_VERSION,
+				"Display application version information\n")
 	;
 
 	profile_command_options_list.add_options()
 		(HIDDEN_PROFILE_OPTION_PROFILE_COMMAND, po::value<string>(),
-			"Profile Commands: create, list, show, set, convert, delete :)\n")
+			"Profile Commands: create, list, show, set, convert, delete, validate-assertion :)\n")
 	;
 
 }
@@ -230,7 +274,7 @@ void ISDevCliConfig::buildOptionsList() {
 
 void ISDevCliConfig::parseConfig(const int argc, const char** argv) {
 
-	string commandString = profileCommandName[nProfileCommand];
+	string commandString = getCommandName();
 
 	// parse command line arguments
 	buildOptions();
@@ -240,7 +284,8 @@ void ISDevCliConfig::parseConfig(const int argc, const char** argv) {
 	super_usage.add(profile_command_options_list).add(usage);
 
 	// Handle special case of running command with no options
-	if (argc <= 1) {
+	if ((argc <= 1) ||
+		(strcmp(argv[1],"--help")==0) ) {
 		cout << "Usage:"
 				<< endl << endl;
 				printUsage();
@@ -264,6 +309,8 @@ void ISDevCliConfig::parseConfig(const int argc, const char** argv) {
 
 
 void ISDevCliConfig::getConfig(const int argc, const char** argv, ISAgent *pAgent) {
+
+	argCount = argc;
 
 	// parse command line arguments
 	parseConfig(argc, argv);
@@ -296,9 +343,17 @@ void ISDevCliConfig::validatePersistor(Persistor *persistor) {
 	}
 
 	// If Platform is Linux, Persistor cannot be Persistor type 'default'
-	if (PLATFORM == PLATFORM_LINUX && persistor->sType == PERSISTOR_TYPE_DEFAULT) {
-		fatal(ISSET_ERROR_DEFAULT_PERSISTOR_INVALID_FOR_LINUX,
-				"Default persistor is invalid on Linux systems");
+	if (nVerbose >= 1) {
+		cout << "Platform is: " << PLATFORM << endl;
+	}
+	if (PLATFORM == PLATFORM_LINUX) {
+		if (nVerbose >= 1) {
+			cout << "Verify Persistor type is not 'default'" << endl;
+		}
+		if (persistor->sType == PERSISTOR_TYPE_DEFAULT) {
+			fatal(ISSET_ERROR_DEFAULT_PERSISTOR_INVALID_FOR_LINUX,
+					"Default persistor is invalid on Linux systems");
+		}
 	}
 
 	// If no persistor path is specified, set default path
@@ -330,11 +385,18 @@ void ISDevCliConfig::validatePersistor(Persistor *persistor) {
 		// Note: When a 'default' persistor is used, the profile is saved to a platform-dependent location.
 	}
 
+	fs::path p = persistor->sPath;
+	if (fs::exists(p) && fs::is_directory(p)) {
+		fatal(ISSET_ERROR_INVALID_PERSISTOR_PATH,
+				"Persistor path must include filename\n"
+						+ persistor->sPath);
+	}
+
 	// password persistor checks
 	if (persistor->sType == PERSISTOR_TYPE_PASSWORD) {
 		if (bQuiet) { // non-interactive
 			// If persistor type is password, a password argument must be provided (throw error)
-			if (persistor->sPassword == "") {
+			if (persistor->sPassword.empty()) {
 				fatal(ISSET_ERROR_MISSING_REQUIRED_ARG,
 					"If 'password' persistor is specified, 'persistor-password' must be provided");
 			}
@@ -344,11 +406,16 @@ void ISDevCliConfig::validatePersistor(Persistor *persistor) {
 					"Persistor password must be at least 6 characters");
 			}
 		} else { // interactive
-			while (persistor->sPassword.size() < 6) {
-				cout << "Please create a valid password for this persistor (must be at least 6 characters): was:"
-						<< persistor->sPassword << " enter: ";
+			if (sCommandName.compare("create") == 0) {
+				// creating new password allow repeat try if too short
+				while (persistor->sPassword.size() < 6) {
+					cout << "Please create/enter password for this persistor (must be at least 6 characters): ";
+					getline(cin, persistor->sPassword);
+				}
+			} else if (persistor->sPassword.empty()) {
+				// Password should be known for other commands no retry
+				cout << "Please enter password for this persistor: ";
 				getline(cin, persistor->sPassword);
-				cout << "password now: " << persistor->sPassword << endl;
 			}
 		}
 	}
@@ -415,15 +482,14 @@ void ISDevCliConfig::invokeAction(ISAgent *pAgent) {
 // Initialize the agent with a respective Persistor
 // Returns respective Persistor for further use in other functions
 // Returns nullptr if invalid type of Persistor
-ISAgentDeviceProfilePersistor * ISDevCliConfig::initWithPersistor(ISAgent *pAgent, Persistor persistor) {
+std::unique_ptr<ISAgentDeviceProfilePersistor> ISDevCliConfig::initWithPersistor(ISAgent *pAgent, Persistor persistor) {
 
 	if (persistor.sType.compare(PERSISTOR_TYPE_DEFAULT) == 0) { // Default Persistor
 		cout << "---> Initializing Ionic Agent Default Persistor profiles"
 				<< endl;
 
 		// Persistor config
-		ISAgentDeviceProfilePersistorDefault *defaultPersistor =
-				new ISAgentDeviceProfilePersistorDefault();
+		std::unique_ptr<ISAgentDeviceProfilePersistorDefault> defaultPersistor(new ISAgentDeviceProfilePersistorDefault());
 
 		// Initialize the Ionic Agent
 		int nErr = pAgent->initialize(*defaultPersistor);
@@ -432,7 +498,7 @@ ISAgentDeviceProfilePersistor * ISDevCliConfig::initWithPersistor(ISAgent *pAgen
 					"[!FATAL] Failed to initialize Ionic Agent.");
 		}
 
-		return defaultPersistor;
+		return std::move(defaultPersistor);
 
 	} else if (persistor.sType.compare(PERSISTOR_TYPE_PLAINTEXT) == 0) { // Plaintext Persistor
 		cout
@@ -440,8 +506,7 @@ ISAgentDeviceProfilePersistor * ISDevCliConfig::initWithPersistor(ISAgent *pAgen
 				<< endl;
 
 		// Persistor config
-		ISAgentDeviceProfilePersistorPlaintext *plaintextPersistor =
-				new ISAgentDeviceProfilePersistorPlaintext();
+		std::unique_ptr<ISAgentDeviceProfilePersistorPlaintext> plaintextPersistor(new ISAgentDeviceProfilePersistorPlaintext());
 		plaintextPersistor->setFilePath(persistor.sPath);
 
 		// Initialize the Ionic Agent
@@ -451,7 +516,7 @@ ISAgentDeviceProfilePersistor * ISDevCliConfig::initWithPersistor(ISAgent *pAgen
 					"[!FATAL] Failed to initialize Ionic Agent.");
 		}
 
-		return plaintextPersistor;
+		return std::move(plaintextPersistor);
 
 	} else if (persistor.sType.compare(PERSISTOR_TYPE_PASSWORD) == 0) { // Password Persistor
 		cout
@@ -459,8 +524,7 @@ ISAgentDeviceProfilePersistor * ISDevCliConfig::initWithPersistor(ISAgent *pAgen
 				<< endl;
 
 		// Persistor config
-		ISAgentDeviceProfilePersistorPassword *passwordPersistor =
-				new ISAgentDeviceProfilePersistorPassword();
+		std::unique_ptr<ISAgentDeviceProfilePersistorPassword> passwordPersistor(new ISAgentDeviceProfilePersistorPassword());
 		passwordPersistor->setPassword(persistor.sPassword);
 		passwordPersistor->setFilePath(persistor.sPath);
 
@@ -472,7 +536,7 @@ ISAgentDeviceProfilePersistor * ISDevCliConfig::initWithPersistor(ISAgent *pAgen
 					"[!FATAL] Failed to initialize Ionic Agent.");
 		}
 
-		return passwordPersistor;
+		return std::move(passwordPersistor);
 
 	} else if (persistor.sType.compare(PERSISTOR_TYPE_AESGCM) == 0) { // AesGcm Persistor
 		cout
@@ -480,8 +544,7 @@ ISAgentDeviceProfilePersistor * ISDevCliConfig::initWithPersistor(ISAgent *pAgen
 				<< endl;
 
 		// Persistor config
-		ISAgentDeviceProfilePersistorAesGcm *pAesGcmPersistor =
-				new ISAgentDeviceProfilePersistorAesGcm();
+		std::unique_ptr<ISAgentDeviceProfilePersistorAesGcm> pAesGcmPersistor(new ISAgentDeviceProfilePersistorAesGcm());
 		string authData = persistor.sAesGcmAdata;
 		ISCryptoBytes cbAuthData((byte*) authData.data(), authData.size());
 		ISCryptoBytes cbPersistorKey;
@@ -499,7 +562,7 @@ ISAgentDeviceProfilePersistor * ISDevCliConfig::initWithPersistor(ISAgent *pAgen
 					"[!FATAL] Failed to initialize Ionic Agent.");
 		}
 
-		return pAesGcmPersistor;
+		return std::move(pAesGcmPersistor);
 
 	} else {
 		return nullptr;

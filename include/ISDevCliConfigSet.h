@@ -17,8 +17,8 @@ class ISDevCliConfigSet : public ISDevCliConfig {
 		const char *const DEVICE_ID_USAGE			= "--device-id <DEVICE_ID>";
 
 
-		ISDevCliConfigSet(int action = PROFILE_COMMAND_SET, int verbosity = 0 ) :
-				ISDevCliConfig( action, verbosity ) {
+		ISDevCliConfigSet(int verbosity = 0 ) :
+				ISDevCliConfig(verbosity) {
 		}
 
 		~ISDevCliConfigSet() {}
